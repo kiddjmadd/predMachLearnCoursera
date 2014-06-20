@@ -1,0 +1,95 @@
+Project Write-Up - Practical Machine Learning
+========================================================
+The goal of this project is to build a machine learning algorithm to predict activity quality from activity monitors.
+
+First, we load some libraries along with the datasets and prepare it for analysis / model development
+
+```{r}
+library(caret)
+library(ggplot2)
+library(knitr)
+
+# get to directory with files (if needed)
+setwd("coursera/predMachLearn")
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+inTrain <- createDataPartition(training$classe,p=0.25,list=FALSE)
+trainPart<-training[inTrain,]
+```
+
+With the data loaded, we can clean it for processing:
+```{r}
+
+#clean data (some of these code snippets are modified from the forums):
+NAs <- apply(training,2,function(x) {sum(is.na(x))}) 
+validData <- training[,which(NAs == 0)]
+
+trainIndex <- createDataPartition(y = validData$classe, p=0.4,list=FALSE)
+trainData <- validData[trainIndex,]
+
+# discards unuseful predictors
+removeIndex <- grep("timestamp|X|user_name|new_window",names(trainData))
+trainData <- trainData[,-removeIndex]
+
+# I'll bet we can get pretty accurate using just the numeric sensor data
+num_only <- sapply(trainData, is.numeric)
+# that would blow away the 'classe' column so I need to add that back in
+# before filtering:
+num_only[87]=TRUE
+
+trainData <- trainData[,num_only]
+
+```
+
+With the data cleaned, we can proceed to train the model:
+```{r}
+
+set.seed(1337)
+
+tr = trainControl(method = "cv", number = 4)
+
+# make model
+
+modFit <- train(classe ~.,data = trainData,method="rf",preProcess=c("center","scale","pca"), trControl=tr)
+
+# check our work:
+modFit
+```
+
+
+Not sure what to expect for error so need to cross validate on the test set.
+
+```{r}
+# try on the Cross Validation set:
+
+xValTest <- training[-inTrain,]
+xValPred <- predict(modFit,xValTest)
+predRight <- xValPred == training[-inTrain,]$classe
+accuracy <- sum(predRight)/length(predRight)
+
+# not bad, accuracy > 97%
+
+```
+
+```{r}
+# Finally, do the test set:
+
+testPred <- predict(modFit,testing)
+
+# and load submit function:
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(testPred)
+
+# Files are loaded manually. Model classified 17/20 correctly so I'm happy with that.
+
+```
+
+
