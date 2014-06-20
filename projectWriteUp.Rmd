@@ -9,26 +9,28 @@ library(caret)
 library(ggplot2)
 library(knitr)
 
-# get to directory with files (if needed)
-setwd("coursera/predMachLearn")
+# for reproducibility
+set.seed(1337)
+
+# This file assumes we're in same directory as data
+# setwd("coursera/predMachLearn")
 training <- read.csv("pml-training.csv")
 testing <- read.csv("pml-testing.csv")
-inTrain <- createDataPartition(training$classe,p=0.25,list=FALSE)
-trainPart<-training[inTrain,]
+
 ```
 
 With the data loaded, we can clean it for processing:
 ```{r}
 
 #clean data (some of these code snippets are modified from the forums):
-NAs <- apply(training,2,function(x) {sum(is.na(x))}) 
-validData <- training[,which(NAs == 0)]
+NAs <- apply(training,2,function(x) {sum(is.na(x))})  #<FORUM SNIPPET>
+validData <- training[,which(NAs == 0)] #<FORUM SNIPPET>
 
-trainIndex <- createDataPartition(y = validData$classe, p=0.4,list=FALSE)
+trainIndex <- createDataPartition(y = validData$classe, p=0.1,list=FALSE) # pared this down so it won't take forever to knit...
 trainData <- validData[trainIndex,]
 
-# discards unuseful predictors
-removeIndex <- grep("timestamp|X|user_name|new_window",names(trainData))
+# discards unuseful predictors 
+removeIndex <- grep("timestamp|X|user_name|new_window",names(trainData)) # <FORUM SNIPPET>
 trainData <- trainData[,-removeIndex]
 
 # I'll bet we can get pretty accurate using just the numeric sensor data
@@ -44,9 +46,7 @@ trainData <- trainData[,num_only]
 With the data cleaned, we can proceed to train the model:
 ```{r}
 
-set.seed(1337)
-
-tr = trainControl(method = "cv", number = 4)
+tr = trainControl(method = "cv", number = 4) # < FORUM CODE SNIPPET, this really sped things up and improved memory use >
 
 # make model
 
@@ -57,17 +57,18 @@ modFit
 ```
 
 
-Not sure what to expect for error so need to cross validate on the test set.
+Not sure what to expect for error, so need to cross validate on the test set.
 
 ```{r}
 # try on the Cross Validation set:
 
-xValTest <- training[-inTrain,]
+xValTest <- training[-trainIndex,]
 xValPred <- predict(modFit,xValTest)
-predRight <- xValPred == training[-inTrain,]$classe
+predRight <- xValPred == training[-trainIndex,]$classe
 accuracy <- sum(predRight)/length(predRight)
 
-# not bad, accuracy > 97%
+accuracy
+# Accuracy was > 97% for training with 40% of the data
 
 ```
 
